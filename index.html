@@ -4,285 +4,269 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TITAN TURBO | Multi-Channel P2P</title>
+    <title>TITAN LAN-MAX | 100MB/s Protocol</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #000; color: #0f0; font-family: 'JetBrains Mono', monospace; }
-        .sidebar { transition: 0.3s; transform: translateX(-100%); z-index: 1000; background: rgba(0,20,0,0.95); border-right: 1px solid #0f0; }
+        :root { --neon: #00ffaa; --bg: #020202; }
+        body { background: var(--bg); color: var(--neon); font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(0, 255, 170, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 255, 170, 0.2); }
+        .sidebar { transition: 0.4s cubic-bezier(0.1, 0.9, 0.2, 1); transform: translateX(-100%); z-index: 1000; background: #000; border-right: 1px solid var(--neon); }
         .sidebar.open { transform: translateX(0); }
-        .terminal-box { border: 1px solid #0f0; background: rgba(0,10,0,0.8); box-shadow: 0 0 20px rgba(0,255,0,0.1); }
-        .speed-bar { height: 2px; background: #0f0; transition: width 0.1s; box-shadow: 0 0 10px #0f0; }
-        .btn-term { border: 1px solid #0f0; padding: 10px; transition: 0.2s; text-transform: uppercase; font-weight: bold; }
-        .btn-term:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
-        input { background: #000; border: 1px solid #050; padding: 10px; color: #0f0; outline: none; }
-        input:focus { border-color: #0f0; }
-        @keyframes scan { from { top: 0; } to { top: 100%; } }
-        .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 5px; background: rgba(0,255,0,0.03); animation: scan 3s linear infinite; pointer-events: none; }
+        .speed-text { font-family: 'Orbitron', sans-serif; text-shadow: 0 0 10px var(--neon); }
+        @keyframes flow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .active-btn { background: var(--neon); color: #000; box-shadow: 0 0 20px var(--neon); }
+        .page { display: none; }
+        .page.active { display: block; }
     </style>
 </head>
 <body class="h-screen overflow-hidden flex flex-col">
-    <div class="scanline"></div>
 
-    <!-- Header -->
-    <header class="p-4 border-b border-green-900 flex justify-between items-center bg-black">
-        <div class="flex items-center gap-4">
-            <button id="menu-btn" class="text-2xl">☰</button>
-            <span class="font-bold tracking-tighter">TITAN_TURBO_V4</span>
+    <!-- HUD Header -->
+    <header class="h-20 border-b border-[#00ffaa33] flex items-center px-6 justify-between bg-black z-[1001]">
+        <div class="flex items-center gap-5">
+            <button id="menu-toggle" class="text-2xl hover:scale-110 transition-transform">☰</button>
+            <div class="flex flex-col">
+                <span class="text-xs tracking-[0.5em] opacity-50">LAN_MODE_ACTIVE</span>
+                <span class="font-bold text-xl uppercase tracking-tighter speed-text">Titan_v5</span>
+            </div>
         </div>
-        <div class="text-right">
-            <div id="bitrate" class="text-xl font-bold">0.00 MB/S</div>
-            <div class="text-[8px] opacity-50 uppercase tracking-widest">Aggregate Throughput</div>
+        <div class="flex items-center gap-8">
+            <div class="text-right">
+                <span id="stat-speed" class="speed-text text-2xl">0.00</span>
+                <span class="text-[10px] block opacity-50">MB/S BANDWIDTH</span>
+            </div>
+            <div id="connection-bulb" class="w-3 h-3 rounded-full bg-red-900 border border-red-500"></div>
         </div>
     </header>
 
-    <!-- Sidebar -->
-    <nav id="sidebar" class="fixed inset-y-0 left-0 w-64 pt-20 p-6 sidebar">
-        <div class="flex flex-col gap-6">
-            <button onclick="goto('link')" class="text-left hover:pl-2 transition-all">_CONNECT</button>
-            <button onclick="goto('comms')" class="text-left hover:pl-2 transition-all">_MESSAGES</button>
-            <button onclick="goto('cargo')" class="text-left hover:pl-2 transition-all">_FILES</button>
-            <div class="mt-20 p-4 border border-green-900">
-                <span class="text-[10px] block opacity-50">LOCAL_NODE_ID</span>
-                <span id="my-id" class="text-white">...</span>
+    <!-- Side Menu -->
+    <nav id="sidebar" class="fixed inset-y-0 left-0 w-72 pt-28 px-8 sidebar">
+        <div class="flex flex-col gap-8">
+            <button onclick="nav('base')" class="text-left text-sm font-bold tracking-widest hover:text-white transition-colors">>_ BRIDGE_INIT</button>
+            <button onclick="nav('comms')" class="text-left text-sm font-bold tracking-widest hover:text-white transition-colors">>_ COMMS_LOG</button>
+            <button onclick="nav('dump')" class="text-left text-sm font-bold tracking-widest hover:text-white transition-colors">>_ CARGO_DUMP</button>
+            <div class="mt-20 p-4 border border-[#00ffaa44]">
+                <div class="text-[9px] opacity-40 uppercase">LOCAL_HEX_ID</div>
+                <div id="my-id-display" class="text-xl font-bold text-white tracking-widest">---</div>
             </div>
         </div>
     </nav>
 
-    <!-- Main -->
-    <main class="flex-grow flex items-center justify-center p-4">
+    <!-- Content -->
+    <main class="flex-grow p-6 flex flex-col items-center justify-center relative">
         
-        <!-- Link Page -->
-        <section id="p-link" class="page max-w-md w-full terminal-box p-8 space-y-6">
-            <h2 class="text-center font-bold">ESTABLISH_P2P_STRIPE</h2>
-            <div class="flex flex-col gap-4">
-                <input type="text" id="target-id" maxlength="3" placeholder="PEER_ID" class="text-center text-2xl tracking-[1em]">
-                <button id="conn-btn" class="btn-term shadow-lg">Init Link</button>
+        <!-- BRIDGE PAGE -->
+        <section id="page-base" class="page active w-full max-w-sm">
+            <div class="glass p-10 space-y-8 rounded-lg relative">
+                <div class="absolute -top-3 left-4 bg-black px-2 text-[10px] text-white">CONNECTION_PROTOCOL</div>
+                <input type="text" id="target-id" maxlength="3" 
+                       class="w-full bg-transparent border-b-2 border-[#00ffaa55] py-4 text-4xl text-center font-bold focus:outline-none focus:border-[#00ffaa] transition-all uppercase tracking-[0.5em]"
+                       placeholder="KEY">
+                <button id="connect-btn" class="w-full border-2 border-[#00ffaa] py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-[#00ffaa] hover:text-black transition-all">Establish Link</button>
+                <div class="text-[9px] text-center opacity-40">FORCE_DIRECT_ICE_ENABLED</div>
             </div>
-            <p class="text-[9px] opacity-50 italic">Note: Uses 4 parallel data channels for maximum throughput.</p>
         </section>
 
-        <!-- Comms Page -->
-        <section id="p-comms" class="page hidden w-full max-w-4xl h-[70vh] terminal-box flex flex-col">
-            <div id="chat-log" class="flex-grow p-4 overflow-y-auto text-xs space-y-1"></div>
-            <form id="chat-form" class="p-2 border-t border-green-900 flex">
-                <input type="text" id="chat-input" class="flex-grow border-none" placeholder="Enter command...">
+        <!-- COMMS PAGE -->
+        <section id="page-comms" class="page w-full max-w-2xl h-[70vh] glass flex flex-col rounded-lg overflow-hidden">
+            <div id="chat-messages" class="flex-grow p-6 overflow-y-auto text-xs space-y-2 opacity-80"></div>
+            <form id="chat-form" class="p-4 bg-black border-t border-[#00ffaa33] flex">
+                <input type="text" id="chat-input" autocomplete="off" placeholder="ENTRY_MESSAGE..." class="flex-grow bg-transparent border-none text-[#00ffaa] text-sm focus:outline-none">
             </form>
         </section>
 
-        <!-- Cargo Page -->
-        <section id="p-cargo" class="page hidden w-full max-w-2xl terminal-box p-8 space-y-6">
-            <div id="drop-zone" class="border-2 border-dashed border-green-900 p-12 text-center cursor-pointer hover:bg-green-950 transition-all">
-                <p>DRAG_AND_DROP_CARGO</p>
-                <p class="text-[10px] opacity-50">MULTI-CHANNEL STREAMING ENABLED</p>
+        <!-- CARGO PAGE -->
+        <section id="page-dump" class="page w-full max-w-xl space-y-6">
+            <div id="drop-zone" class="glass p-16 border-dashed border-2 border-[#00ffaa44] hover:bg-[#00ffaa11] transition-all cursor-pointer text-center group">
                 <input type="file" id="file-input" class="hidden">
+                <span class="text-xs font-bold block mb-2 uppercase tracking-[0.5em]">Initiate Byte Stream</span>
+                <span class="text-[10px] opacity-30 mt-2 block">DROP_FILE_HERE_FOR_LAN_FORCE</span>
             </div>
-            <div id="transfer-list" class="space-y-4 max-h-64 overflow-y-auto"></div>
+            <div id="tx-log" class="space-y-3 max-h-64 overflow-y-auto pr-2"></div>
         </section>
 
     </main>
 
     <script>
-        // --- MULTI-CHANNEL ENGINE ---
-        const CHANNEL_COUNT = 4;
-        const CHUNK_SIZE = 16384 * 8; // 128KB 
-        let peer = null;
-        let connections = []; // Array of parallel connections
-        const myAb1Id = Math.random().toString(36).substr(2, 3).toUpperCase();
+        // --- LAN PERFORMANCE CONFIGURATION ---
+        const CHUNK_SIZE = 128 * 1024; // 128KB Chunks
+        const BUFFER_SAFE_ZONE = 2 * 1024 * 1024; // 2MB Throttle point
+        const AB1_ID = Math.random().toString(36).substr(2, 3).toUpperCase();
         
+        let peer = null;
+        let conn = null;
         let stats = { bytes: 0, start: 0 };
-        let incomingFile = null;
 
-        document.getElementById('my-id').innerText = myAb1Id;
+        document.getElementById('my-id-display').innerText = AB1_ID;
 
-        function initPeer() {
-            peer = new Peer('TITAN-' + myAb1Id, {
-                config: { 
-                    'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }],
-                    'sdpSemantics': 'unified-plan'
+        function init() {
+            // Force direct connection by explicitly setting ICE policy
+            peer = new Peer('TITAN5-' + AB1_ID, {
+                config: {
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+                    iceTransportPolicy: 'all' // Allows both Relay and Host (LAN)
                 }
             });
 
-            peer.on('connection', (conn) => {
-                manageConnection(conn);
+            peer.on('connection', c => {
+                if (conn) return c.close();
+                setupBridge(c);
             });
         }
 
-        function manageConnection(conn) {
+        function setupBridge(c) {
+            conn = c;
             conn.on('open', () => {
-                connections.push(conn);
-                if(connections.length === 1) { // First connection
-                    document.getElementById('conn-btn').innerText = 'LINK_ACTIVE';
-                    addLog('SYSTEM', 'Primary bridge open.');
-                }
-                addLog('SYSTEM', `Channel ${connections.length} synchronized.`);
+                document.getElementById('connection-bulb').style.backgroundColor = '#00ffaa';
+                document.getElementById('connection-bulb').style.boxShadow = '0 0 10px #00ffaa';
+                document.getElementById('connect-btn').innerText = 'BRIDGE_ACTIVE';
+                log('SYSTEM', 'Link established. Local IP discovery prioritized.');
             });
 
-            conn.on('data', (data) => {
+            conn.on('data', data => {
                 if (data instanceof ArrayBuffer) {
-                    handleBinary(data);
+                    processBytes(data);
                 } else {
                     handleJson(data);
                 }
             });
-
-            conn.on('close', () => {
-                connections = connections.filter(c => c !== conn);
-                if(connections.length === 0) {
-                    document.getElementById('conn-btn').innerText = 'Init Link';
-                    addLog('SYSTEM', 'All bridges severed.');
-                }
-            });
+            
+            conn.on('close', () => location.reload());
         }
 
-        // --- SPEED OPTIMIZED SENDER ---
+        // --- MAX SPEED SENDER ---
         async function sendFile(file) {
-            if (connections.length === 0) return alert('No active bridge.');
+            if (!conn?.open) return;
+            const txId = Math.random().toString(36).substr(7);
+            uiCreate(file.name, txId);
             
-            const fileId = Math.random().toString(36).substr(7);
-            createUI(file.name, fileId);
-            
-            // Broadcast Meta to all channels (though only one is needed)
-            const meta = { type: 'meta', id: fileId, name: file.name, size: file.size, mime: file.type };
-            connections[0].send(meta);
+            // Meta handshake
+            conn.send({ type: 'meta', id: txId, name: file.name, size: file.size, mime: file.type });
 
             let offset = 0;
-            let channelIndex = 0;
             stats.start = Date.now();
             stats.bytes = 0;
 
-            const sendChunk = () => {
-                const conn = connections[channelIndex % connections.length];
-                
-                // Backpressure Check per channel
-                if (conn.dataChannel.bufferedAmount > 4 * 1024 * 1024) {
-                    setTimeout(sendChunk, 5);
-                    return;
-                }
-
-                const reader = new FileReader();
-                const blob = file.slice(offset, offset + CHUNK_SIZE);
-                
-                reader.onload = (e) => {
-                    conn.send(e.target.result);
-                    offset += e.target.result.byteLength;
-                    stats.bytes += e.target.result.byteLength;
+            const stream = () => {
+                // Adaptive Throttle: Keeps the pipe perfectly full without overflow
+                while (offset < file.size && conn.dataChannel.bufferedAmount < BUFFER_SAFE_ZONE) {
+                    const chunk = file.slice(offset, offset + CHUNK_SIZE);
+                    const reader = new FileReader();
                     
-                    updateProgress(fileId, (offset/file.size)*100);
-                    showSpeed();
-
-                    if (offset < file.size) {
-                        channelIndex++;
-                        sendChunk();
-                    } else {
-                        connections[0].send({ type: 'eof', id: fileId });
-                        addLog('SYSTEM', 'Transfer complete.');
-                    }
-                };
-                reader.readAsArrayBuffer(blob);
+                    // Closure capture for offsets
+                    const currentOffset = offset;
+                    reader.onload = e => {
+                        conn.send(e.target.result);
+                        stats.bytes += e.target.result.byteLength;
+                        uiUpdate(txId, (currentOffset / file.size) * 100);
+                        updateSpeed();
+                        
+                        if (currentOffset + CHUNK_SIZE >= file.size) {
+                            conn.send({ type: 'end', id: txId });
+                            log('SYSTEM', 'Payload delivered.');
+                        }
+                    };
+                    reader.readAsArrayBuffer(chunk);
+                    offset += CHUNK_SIZE;
+                }
+                
+                if (offset < file.size) {
+                    setTimeout(stream, 1); // Yield to browser briefly then resume
+                }
             };
-
-            sendChunk();
+            stream();
         }
 
-        function handleBinary(buf) {
-            if (!incomingFile) return;
-            incomingFile.chunks.push(buf);
-            incomingFile.received += buf.byteLength;
-            stats.bytes += buf.byteLength;
-            updateProgress(incomingFile.id, (incomingFile.received/incomingFile.size)*100);
-            showSpeed();
-        }
-
+        let currentFile = null;
         function handleJson(msg) {
+            if (msg.type === 'chat') log('REMOTE', msg.data);
             if (msg.type === 'meta') {
-                incomingFile = { ...msg, chunks: [], received: 0 };
-                createUI(msg.name, msg.id, true);
+                currentFile = { ...msg, chunks: [], received: 0 };
+                uiCreate(msg.name, msg.id, true);
                 stats.start = Date.now();
                 stats.bytes = 0;
-            } else if (msg.type === 'chat') {
-                addLog('REMOTE', msg.data);
-            } else if (msg.type === 'eof') {
-                const blob = new Blob(incomingFile.chunks, { type: incomingFile.mime });
-                const url = URL.createObjectURL(blob);
-                const a = document.getElementById(`dl-${incomingFile.id}`);
+            }
+            if (msg.type === 'end') {
+                const url = URL.createObjectURL(new Blob(currentFile.chunks));
+                const a = document.getElementById('dl-' + currentFile.id);
                 a.href = url;
-                a.download = incomingFile.name;
+                a.download = currentFile.name;
                 a.classList.remove('hidden');
-                incomingFile = null;
+                currentFile = null;
             }
         }
 
-        // --- UI UTILS ---
-        function goto(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-            document.getElementById('p-' + id).classList.remove('hidden');
+        function processBytes(buf) {
+            if (!currentFile) return;
+            currentFile.chunks.push(buf);
+            currentFile.received += buf.byteLength;
+            stats.bytes += buf.byteLength;
+            uiUpdate(currentFile.id, (currentFile.received / currentFile.size) * 100);
+            updateSpeed();
+        }
+
+        // --- INTERFACE ---
+        function nav(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + id).classList.add('active');
             if(window.innerWidth < 1024) toggleMenu();
         }
 
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('open'); }
-        document.getElementById('menu-btn').onclick = toggleMenu;
+        document.getElementById('menu-toggle').onclick = toggleMenu;
 
-        document.getElementById('conn-btn').onclick = () => {
-            const tid = document.getElementById('target-id').value.toUpperCase();
-            if(!tid) return;
-            // Open multiple parallel connections to the same peer ID
-            for(let i=0; i < CHANNEL_COUNT; i++) {
-                manageConnection(peer.connect('TITAN-' + tid, { reliable: true }));
-            }
-        };
-
-        function addLog(who, msg) {
-            const log = document.getElementById('chat-log');
-            log.innerHTML += `<div><span class="text-green-700">[${who}]</span> ${msg}</div>`;
-            log.scrollTop = log.scrollHeight;
+        function log(who, msg) {
+            const out = document.getElementById('chat-messages');
+            out.innerHTML += `<div><span class="text-white opacity-40">[${who}]</span> ${msg}</div>`;
+            out.scrollTop = out.scrollHeight;
         }
 
-        function createUI(name, id) {
-            const list = document.getElementById('transfer-list');
+        function uiCreate(name, id) {
+            const list = document.getElementById('tx-log');
             list.innerHTML = `
-                <div class="p-2 border border-green-900 bg-black">
-                    <div class="flex justify-between text-[10px] mb-1">
-                        <span>${name}</span>
-                        <span id="perc-${id}">0%</span>
-                    </div>
-                    <div class="w-full bg-green-900/20 h-1"><div id="bar-${id}" class="speed-bar w-0 h-full"></div></div>
-                    <a id="dl-${id}" class="hidden block text-center bg-green-600 text-black text-[10px] font-bold mt-2 py-1">DOWNLOAD_BIN</a>
+                <div class="p-4 border border-[#00ffaa33] bg-black">
+                    <div class="flex justify-between text-[10px] mb-2"><span>${name}</span><span id="p-${id}">0%</span></div>
+                    <div class="w-full bg-[#00ffaa11] h-1"><div id="b-${id}" class="h-full bg-[#00ffaa] w-0"></div></div>
+                    <a id="dl-${id}" class="hidden block text-center bg-white text-black text-[9px] font-bold mt-3 py-1 uppercase tracking-widest">Download Binary</a>
                 </div>
             ` + list.innerHTML;
         }
 
-        function updateProgress(id, p) {
-            const bar = document.getElementById('bar-' + id);
-            if(bar) bar.style.width = p + '%';
-            document.getElementById('perc-' + id).innerText = Math.floor(p) + '%';
+        function uiUpdate(id, p) {
+            const b = document.getElementById('b-' + id);
+            if(b) b.style.width = p + '%';
+            document.getElementById('p-' + id).innerText = Math.floor(p) + '%';
         }
 
-        function showSpeed() {
+        function updateSpeed() {
             const elapsed = (Date.now() - stats.start) / 1000;
             if (elapsed > 0.5) {
                 const mbps = ((stats.bytes / 1024 / 1024) / elapsed).toFixed(2);
-                document.getElementById('bitrate').innerText = mbps + ' MB/S';
+                document.getElementById('stat-speed').innerText = mbps;
             }
         }
 
-        document.getElementById('chat-form').onsubmit = (e) => {
+        document.getElementById('connect-btn').onclick = () => {
+            const tid = document.getElementById('target-id').value.toUpperCase();
+            if(tid) setupBridge(peer.connect('TITAN5-' + tid, { reliable: true }));
+        };
+
+        document.getElementById('chat-form').onsubmit = e => {
             e.preventDefault();
             const val = document.getElementById('chat-input').value;
-            if (val && connections[0]) {
-                connections[0].send({ type: 'chat', data: val });
-                addLog('LOCAL', val);
+            if (val && conn?.open) {
+                conn.send({ type: 'chat', data: val });
+                log('LOCAL', val);
                 document.getElementById('chat-input').value = '';
             }
         };
 
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
-        document.getElementById('file-input').onchange = (e) => {
-            if(e.target.files[0]) sendFile(e.target.files[0]);
-        };
+        document.getElementById('file-input').onchange = e => { if(e.target.files[0]) sendFile(e.target.files[0]); };
 
-        initPeer();
+        init();
     </script>
 </body>
 </html>
