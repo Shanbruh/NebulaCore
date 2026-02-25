@@ -3,262 +3,341 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TITAN LAN-MAX | 100MB/s Protocol</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>TITAN X | Ultimate P2P</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --neon: #00ffaa; --bg: #020202; }
-        body { background: var(--bg); color: var(--neon); font-family: 'JetBrains Mono', monospace; }
-        .glass { background: rgba(0, 255, 170, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(0, 255, 170, 0.2); }
-        .sidebar { transition: 0.4s cubic-bezier(0.1, 0.9, 0.2, 1); transform: translateX(-100%); z-index: 1000; background: #000; border-right: 1px solid var(--neon); }
-        .sidebar.open { transform: translateX(0); }
-        .speed-text { font-family: 'Orbitron', sans-serif; text-shadow: 0 0 10px var(--neon); }
-        @keyframes flow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        .active-btn { background: var(--neon); color: #000; box-shadow: 0 0 20px var(--neon); }
-        .page { display: none; }
-        .page.active { display: block; }
+        :root { --neon: #00f3ff; --bg: #08080a; }
+        body {
+            background-color: var(--bg);
+            color: #d1d5db;
+            font-family: 'JetBrains Mono', monospace;
+            height: 100dvh; /* Dynamic Viewport Height for Mobile */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+        
+        /* Glassmorphism Refined */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+        }
+        
+        /* Sidebar Overlay Fix */
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100dvh;
+            width: 280px;
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(5, 5, 7, 0.98);
+            border-right: 1px solid rgba(0, 243, 255, 0.3);
+            padding-top: calc(1rem + env(safe-area-inset-top));
+        }
+        #sidebar.open { transform: translateX(0); }
+
+        /* Speed Glow */
+        .neon-accent { color: var(--neon); text-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
+        .progress-bar { transition: width 0.15s linear; height: 100%; background: var(--neon); box-shadow: 0 0 15px var(--neon); }
+
+        /* Mobile Adjustments */
+        @media (max-width: 640px) {
+            .page-container { padding: 1rem; }
+            .stat-text { font-size: 0.75rem; }
+        }
+
+        .scroll-custom::-webkit-scrollbar { width: 4px; }
+        .scroll-custom::-webkit-scrollbar-thumb { background: rgba(0, 243, 255, 0.2); border-radius: 10px; }
+        
+        .active-nav { border-left: 4px solid var(--neon); background: rgba(0, 243, 255, 0.05); color: var(--neon); }
     </style>
 </head>
-<body class="h-screen overflow-hidden flex flex-col">
+<body>
 
-    <!-- HUD Header -->
-    <header class="h-20 border-b border-[#00ffaa33] flex items-center px-6 justify-between bg-black z-[1001]">
-        <div class="flex items-center gap-5">
-            <button id="menu-toggle" class="text-2xl hover:scale-110 transition-transform">☰</button>
-            <div class="flex flex-col">
-                <span class="text-xs tracking-[0.5em] opacity-50">LAN_MODE_ACTIVE</span>
-                <span class="font-bold text-xl uppercase tracking-tighter speed-text">Titan_v5</span>
-            </div>
+    <!-- Top HUD -->
+    <header class="h-16 flex items-center px-4 md:px-8 bg-black/50 border-b border-white/5 z-[900] justify-between">
+        <div class="flex items-center gap-4">
+            <button id="menu-btn" class="p-2 hover:bg-white/5 rounded-lg text-neon">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <h1 class="orbitron text-lg tracking-widest hidden sm:block">TITAN<span class="text-white opacity-50">_X</span></h1>
         </div>
-        <div class="flex items-center gap-8">
-            <div class="text-right">
-                <span id="stat-speed" class="speed-text text-2xl">0.00</span>
-                <span class="text-[10px] block opacity-50">MB/S BANDWIDTH</span>
+        
+        <div class="flex items-center gap-6">
+            <div class="text-right flex flex-col">
+                <span id="bandwidth" class="text-xl font-bold neon-accent leading-none">0.00</span>
+                <span class="text-[9px] uppercase opacity-40 tracking-tighter">MB/s Aggregate</span>
             </div>
-            <div id="connection-bulb" class="w-3 h-3 rounded-full bg-red-900 border border-red-500"></div>
+            <div id="status-led" class="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_8px_red]"></div>
         </div>
     </header>
 
-    <!-- Side Menu -->
-    <nav id="sidebar" class="fixed inset-y-0 left-0 w-72 pt-28 px-8 sidebar">
-        <div class="flex flex-col gap-8">
-            <button onclick="nav('base')" class="text-left text-sm font-bold tracking-widest hover:text-white transition-colors">>_ BRIDGE_INIT</button>
-            <button onclick="nav('comms')" class="text-left text-sm font-bold tracking-widest hover:text-white transition-colors">>_ COMMS_LOG</button>
-            <button onclick="nav('dump')" class="text-left text-sm font-bold tracking-widest hover:text-white transition-colors">>_ CARGO_DUMP</button>
-            <div class="mt-20 p-4 border border-[#00ffaa44]">
-                <div class="text-[9px] opacity-40 uppercase">LOCAL_HEX_ID</div>
-                <div id="my-id-display" class="text-xl font-bold text-white tracking-widest">---</div>
+    <!-- Side Navigation -->
+    <nav id="sidebar">
+        <div class="p-6 mt-12 flex flex-col gap-2">
+            <p class="text-[10px] uppercase opacity-30 font-bold tracking-[0.3em] mb-4">Core Modules</p>
+            <button onclick="navigate('bridge')" class="nav-btn w-full text-left p-4 uppercase text-xs font-bold tracking-widest transition-all">> Connection</button>
+            <button onclick="navigate('comms')" class="nav-btn w-full text-left p-4 uppercase text-xs font-bold tracking-widest transition-all">> Messages</button>
+            <button onclick="navigate('cargo')" class="nav-btn w-full text-left p-4 uppercase text-xs font-bold tracking-widest transition-all">> Cargo Hold</button>
+            
+            <div class="mt-auto pt-16 border-t border-white/5">
+                <div class="glass-panel p-4">
+                    <span class="text-[9px] uppercase opacity-40">Local Access Key</span>
+                    <div id="my-id" class="text-xl font-bold text-white tracking-[0.2em] mt-1">...</div>
+                </div>
             </div>
         </div>
     </nav>
 
-    <!-- Content -->
-    <main class="flex-grow p-6 flex flex-col items-center justify-center relative">
+    <!-- Main Viewport -->
+    <main class="flex-grow overflow-y-auto overflow-x-hidden scroll-custom relative">
         
-        <!-- BRIDGE PAGE -->
-        <section id="page-base" class="page active w-full max-w-sm">
-            <div class="glass p-10 space-y-8 rounded-lg relative">
-                <div class="absolute -top-3 left-4 bg-black px-2 text-[10px] text-white">CONNECTION_PROTOCOL</div>
-                <input type="text" id="target-id" maxlength="3" 
-                       class="w-full bg-transparent border-b-2 border-[#00ffaa55] py-4 text-4xl text-center font-bold focus:outline-none focus:border-[#00ffaa] transition-all uppercase tracking-[0.5em]"
-                       placeholder="KEY">
-                <button id="connect-btn" class="w-full border-2 border-[#00ffaa] py-4 text-xs font-bold uppercase tracking-[0.3em] hover:bg-[#00ffaa] hover:text-black transition-all">Establish Link</button>
-                <div class="text-[9px] text-center opacity-40">FORCE_DIRECT_ICE_ENABLED</div>
+        <!-- Connection Page -->
+        <section id="p-bridge" class="page-container h-full flex items-center justify-center p-6">
+            <div class="max-w-md w-full glass-panel p-8 space-y-8">
+                <div class="text-center">
+                    <h2 class="orbitron text-sm uppercase opacity-60 tracking-[.5em]">Sync Handshake</h2>
+                </div>
+                <div class="space-y-4">
+                    <input type="text" id="target-id" maxlength="3" 
+                           class="w-full bg-black/40 border border-white/10 p-5 text-4xl text-center font-bold uppercase tracking-[0.8em] focus:outline-none focus:border-cyan-400 rounded-lg transition-all"
+                           placeholder="---">
+                    <button id="connect-btn" class="w-full bg-cyan-400 text-black py-5 text-xs font-bold uppercase tracking-widest hover:bg-white transition-all rounded-lg">Initialize Bridge</button>
+                </div>
+                <div class="p-3 bg-blue-900/10 border border-blue-400/20 text-[10px] text-blue-300 rounded leading-relaxed italic">
+                    INFO: If using same Wi-Fi, Titan X will ignore relay nodes and bridge via local hardware at maximum speed.
+                </div>
             </div>
         </section>
 
-        <!-- COMMS PAGE -->
-        <section id="page-comms" class="page w-full max-w-2xl h-[70vh] glass flex flex-col rounded-lg overflow-hidden">
-            <div id="chat-messages" class="flex-grow p-6 overflow-y-auto text-xs space-y-2 opacity-80"></div>
-            <form id="chat-form" class="p-4 bg-black border-t border-[#00ffaa33] flex">
-                <input type="text" id="chat-input" autocomplete="off" placeholder="ENTRY_MESSAGE..." class="flex-grow bg-transparent border-none text-[#00ffaa] text-sm focus:outline-none">
-            </form>
+        <!-- Chat Page -->
+        <section id="p-comms" class="page-container hidden h-full flex flex-col max-w-5xl mx-auto p-4 md:p-8">
+            <div class="flex-grow glass-panel overflow-hidden flex flex-col mb-4">
+                <div id="chat-stream" class="flex-grow p-6 overflow-y-auto text-xs space-y-3 opacity-90">
+                    <div class="opacity-30 italic">[SYSTEM] Encrypted buffer ready.</div>
+                </div>
+                <form id="chat-form" class="p-4 bg-black/60 border-t border-white/5 flex gap-4">
+                    <input type="text" id="chat-input" autocomplete="off" placeholder="ENTRY DATA..." 
+                           class="flex-grow bg-transparent border-none text-sm text-cyan-400 focus:outline-none">
+                    <button class="text-cyan-400 text-xs font-bold uppercase tracking-widest hover:text-white transition-colors">Send</button>
+                </form>
+            </div>
         </section>
 
-        <!-- CARGO PAGE -->
-        <section id="page-dump" class="page w-full max-w-xl space-y-6">
-            <div id="drop-zone" class="glass p-16 border-dashed border-2 border-[#00ffaa44] hover:bg-[#00ffaa11] transition-all cursor-pointer text-center group">
+        <!-- Files Page -->
+        <section id="p-cargo" class="page-container hidden h-full max-w-3xl mx-auto p-4 md:p-8">
+            <div id="drop-zone" class="glass-panel p-16 border-dashed border-2 border-white/10 hover:border-cyan-400 transition-all cursor-pointer flex flex-col items-center justify-center gap-6 group">
                 <input type="file" id="file-input" class="hidden">
-                <span class="text-xs font-bold block mb-2 uppercase tracking-[0.5em]">Initiate Byte Stream</span>
-                <span class="text-[10px] opacity-30 mt-2 block">DROP_FILE_HERE_FOR_LAN_FORCE</span>
+                <div class="w-20 h-20 rounded-full border border-white/5 flex items-center justify-center group-hover:scale-110 transition-all">
+                    <svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-width="1.5"/></svg>
+                </div>
+                <div class="text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-[0.5em]">Select Byte Stream</p>
+                    <p class="text-[9px] opacity-30 mt-2">Zero-copy local transfer active</p>
+                </div>
             </div>
-            <div id="tx-log" class="space-y-3 max-h-64 overflow-y-auto pr-2"></div>
+            <div id="transfer-list" class="mt-8 space-y-4"></div>
         </section>
 
     </main>
 
     <script>
-        // --- LAN PERFORMANCE CONFIGURATION ---
-        const CHUNK_SIZE = 128 * 1024; // 128KB Chunks
-        const BUFFER_SAFE_ZONE = 2 * 1024 * 1024; // 2MB Throttle point
-        const AB1_ID = Math.random().toString(36).substr(2, 3).toUpperCase();
+        // --- PERFORMANCE ENGINE CONFIG ---
+        const CHUNK_SIZE = 124 * 1024; // Optimized for Chromium pipe
+        const MAX_BUFFER = 2 * 1024 * 1024; // 2MB Sliding window
+        const ab1Id = Math.random().toString(36).substr(2, 3).toUpperCase();
         
         let peer = null;
         let conn = null;
         let stats = { bytes: 0, start: 0 };
+        let activeIncoming = null;
 
-        document.getElementById('my-id-display').innerText = AB1_ID;
+        document.getElementById('my-id').innerText = ab1Id;
 
         function init() {
-            // Force direct connection by explicitly setting ICE policy
-            peer = new Peer('TITAN5-' + AB1_ID, {
-                config: {
+            peer = new Peer('TITAN-X-' + ab1Id, {
+                config: { 
                     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-                    iceTransportPolicy: 'all' // Allows both Relay and Host (LAN)
+                    iceTransportPolicy: 'all' // Allows direct LAN discovery
                 }
             });
 
-            peer.on('connection', c => {
-                if (conn) return c.close();
-                setupBridge(c);
+            peer.on('connection', (c) => {
+                if(conn) return c.close();
+                setupLink(c);
             });
         }
 
-        function setupBridge(c) {
+        function setupLink(c) {
             conn = c;
             conn.on('open', () => {
-                document.getElementById('connection-bulb').style.backgroundColor = '#00ffaa';
-                document.getElementById('connection-bulb').style.boxShadow = '0 0 10px #00ffaa';
-                document.getElementById('connect-btn').innerText = 'BRIDGE_ACTIVE';
-                log('SYSTEM', 'Link established. Local IP discovery prioritized.');
+                document.getElementById('status-led').className = 'w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_10px_#00f3ff]';
+                document.getElementById('connect-btn').innerText = 'BRIDGE_STABLE';
+                log('System', 'Bridge Established. Optimization for LAN 6 enabled.');
             });
 
-            conn.on('data', data => {
+            conn.on('data', (data) => {
                 if (data instanceof ArrayBuffer) {
-                    processBytes(data);
+                    processIncomingBytes(data);
                 } else {
                     handleJson(data);
                 }
             });
-            
+
             conn.on('close', () => location.reload());
         }
 
-        // --- MAX SPEED SENDER ---
+        // --- ULTRA BOLT SENDER ---
         async function sendFile(file) {
-            if (!conn?.open) return;
+            if(!conn?.open) return;
             const txId = Math.random().toString(36).substr(7);
-            uiCreate(file.name, txId);
+            uiTransferCreate(file.name, txId);
             
-            // Meta handshake
-            conn.send({ type: 'meta', id: txId, name: file.name, size: file.size, mime: file.type });
+            // Meta packet
+            conn.send({ type: 'm', id: txId, n: file.name, s: file.size, t: file.type });
 
             let offset = 0;
             stats.start = Date.now();
             stats.bytes = 0;
 
-            const stream = () => {
-                // Adaptive Throttle: Keeps the pipe perfectly full without overflow
-                while (offset < file.size && conn.dataChannel.bufferedAmount < BUFFER_SAFE_ZONE) {
+            const sendNext = () => {
+                // High-performance backpressure monitoring
+                while (offset < file.size && conn.dataChannel.bufferedAmount < MAX_BUFFER) {
                     const chunk = file.slice(offset, offset + CHUNK_SIZE);
                     const reader = new FileReader();
-                    
-                    // Closure capture for offsets
                     const currentOffset = offset;
-                    reader.onload = e => {
+                    
+                    reader.onload = (e) => {
                         conn.send(e.target.result);
                         stats.bytes += e.target.result.byteLength;
-                        uiUpdate(txId, (currentOffset / file.size) * 100);
-                        updateSpeed();
                         
+                        // Performance: Throttle UI updates to once per 10 chunks to save CPU
+                        if(currentOffset % (CHUNK_SIZE * 10) === 0) {
+                            uiUpdateProgress(txId, (currentOffset / file.size) * 100);
+                            updateHUD();
+                        }
+
                         if (currentOffset + CHUNK_SIZE >= file.size) {
-                            conn.send({ type: 'end', id: txId });
-                            log('SYSTEM', 'Payload delivered.');
+                            conn.send({ type: 'e', id: txId });
+                            uiUpdateProgress(txId, 100);
+                            updateHUD();
+                            log('System', 'Transfer sequence complete.');
                         }
                     };
                     reader.readAsArrayBuffer(chunk);
                     offset += CHUNK_SIZE;
                 }
                 
-                if (offset < file.size) {
-                    setTimeout(stream, 1); // Yield to browser briefly then resume
-                }
+                if (offset < file.size) setTimeout(sendNext, 4); // Minimal delay for browser event loop
             };
-            stream();
+            sendNext();
         }
 
-        let currentFile = null;
+        function processIncomingBytes(buf) {
+            if (!activeIncoming) return;
+            activeIncoming.c.push(buf);
+            activeIncoming.r += buf.byteLength;
+            stats.bytes += buf.byteLength;
+            
+            if(activeIncoming.r % (CHUNK_SIZE * 10) === 0) {
+                uiUpdateProgress(activeIncoming.i, (activeIncoming.r / activeIncoming.s) * 100);
+                updateHUD();
+            }
+        }
+
         function handleJson(msg) {
-            if (msg.type === 'chat') log('REMOTE', msg.data);
-            if (msg.type === 'meta') {
-                currentFile = { ...msg, chunks: [], received: 0 };
-                uiCreate(msg.name, msg.id, true);
+            if (msg.type === 'msg') log('Remote', msg.d);
+            if (msg.type === 'm') {
+                activeIncoming = { i: msg.id, n: msg.n, s: msg.s, c: [], r: 0 };
+                uiTransferCreate(msg.n, msg.id, true);
                 stats.start = Date.now();
                 stats.bytes = 0;
             }
-            if (msg.type === 'end') {
-                const url = URL.createObjectURL(new Blob(currentFile.chunks));
-                const a = document.getElementById('dl-' + currentFile.id);
-                a.href = url;
-                a.download = currentFile.name;
+            if (msg.type === 'e') {
+                const blob = new Blob(activeIncoming.c);
+                const a = document.getElementById('dl-' + activeIncoming.i);
+                a.href = URL.createObjectURL(blob);
+                a.download = activeIncoming.n;
                 a.classList.remove('hidden');
-                currentFile = null;
+                uiUpdateProgress(activeIncoming.i, 100);
+                activeIncoming = null;
             }
         }
 
-        function processBytes(buf) {
-            if (!currentFile) return;
-            currentFile.chunks.push(buf);
-            currentFile.received += buf.byteLength;
-            stats.bytes += buf.byteLength;
-            uiUpdate(currentFile.id, (currentFile.received / currentFile.size) * 100);
-            updateSpeed();
+        // --- INTERFACE CONTROL ---
+        function navigate(pageId) {
+            document.querySelectorAll('.page-container').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active-nav'));
+            
+            document.getElementById('p-' + pageId).classList.remove('hidden');
+            const targetBtn = Array.from(document.querySelectorAll('.nav-btn')).find(b => b.onclick.toString().includes(pageId));
+            if(targetBtn) targetBtn.classList.add('active-nav');
+            
+            if(window.innerWidth < 1024) toggleSidebar();
         }
 
-        // --- INTERFACE ---
-        function nav(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-' + id).classList.add('active');
-            if(window.innerWidth < 1024) toggleMenu();
-        }
-
-        function toggleMenu() { document.getElementById('sidebar').classList.toggle('open'); }
-        document.getElementById('menu-toggle').onclick = toggleMenu;
+        const sidebar = document.getElementById('sidebar');
+        function toggleSidebar() { sidebar.classList.toggle('open'); }
+        document.getElementById('menu-btn').onclick = toggleSidebar;
 
         function log(who, msg) {
-            const out = document.getElementById('chat-messages');
-            out.innerHTML += `<div><span class="text-white opacity-40">[${who}]</span> ${msg}</div>`;
+            const out = document.getElementById('chat-stream');
+            out.innerHTML += `<div><span class="text-cyan-400 opacity-60 font-bold uppercase mr-2">${who}:</span> <span>${msg}</span></div>`;
             out.scrollTop = out.scrollHeight;
         }
 
-        function uiCreate(name, id) {
-            const list = document.getElementById('tx-log');
-            list.innerHTML = `
-                <div class="p-4 border border-[#00ffaa33] bg-black">
-                    <div class="flex justify-between text-[10px] mb-2"><span>${name}</span><span id="p-${id}">0%</span></div>
-                    <div class="w-full bg-[#00ffaa11] h-1"><div id="b-${id}" class="h-full bg-[#00ffaa] w-0"></div></div>
-                    <a id="dl-${id}" class="hidden block text-center bg-white text-black text-[9px] font-bold mt-3 py-1 uppercase tracking-widest">Download Binary</a>
+        function uiTransferCreate(name, id, isInc) {
+            const list = document.getElementById('transfer-list');
+            const div = document.createElement('div');
+            div.className = 'glass-panel p-4 flex flex-col gap-3 relative overflow-hidden';
+            div.innerHTML = `
+                <div class="flex justify-between text-[10px] font-bold uppercase tracking-widest z-10">
+                    <span class="truncate w-1/2">${name}</span>
+                    <span id="p-${id}">0.0%</span>
                 </div>
-            ` + list.innerHTML;
+                <div class="h-1 bg-white/5 w-full rounded-full overflow-hidden">
+                    <div id="b-${id}" class="progress-bar w-0"></div>
+                </div>
+                <a id="dl-${id}" class="hidden block text-center bg-cyan-400 text-black text-[9px] font-bold mt-2 py-2 uppercase tracking-[0.2em] rounded">Get Binary</a>
+            `;
+            list.prepend(div);
         }
 
-        function uiUpdate(id, p) {
+        function uiUpdateProgress(id, p) {
             const b = document.getElementById('b-' + id);
+            const t = document.getElementById('p-' + id);
             if(b) b.style.width = p + '%';
-            document.getElementById('p-' + id).innerText = Math.floor(p) + '%';
+            if(t) t.innerText = p.toFixed(1) + '%';
         }
 
-        function updateSpeed() {
-            const elapsed = (Date.now() - stats.start) / 1000;
-            if (elapsed > 0.5) {
-                const mbps = ((stats.bytes / 1024 / 1024) / elapsed).toFixed(2);
-                document.getElementById('stat-speed').innerText = mbps;
+        function updateHUD() {
+            const dt = (Date.now() - stats.start) / 1000;
+            if (dt > 0.5) {
+                const speed = ((stats.bytes / 1024 / 1024) / dt).toFixed(2);
+                document.getElementById('bandwidth').innerText = speed;
             }
         }
 
         document.getElementById('connect-btn').onclick = () => {
             const tid = document.getElementById('target-id').value.toUpperCase();
-            if(tid) setupBridge(peer.connect('TITAN5-' + tid, { reliable: true }));
+            if(tid) setupLink(peer.connect('TITAN-X-' + tid, { reliable: true }));
         };
 
         document.getElementById('chat-form').onsubmit = e => {
             e.preventDefault();
             const val = document.getElementById('chat-input').value;
             if (val && conn?.open) {
-                conn.send({ type: 'chat', data: val });
-                log('LOCAL', val);
+                conn.send({ type: 'msg', d: val });
+                log('Local', val);
                 document.getElementById('chat-input').value = '';
             }
         };
@@ -266,7 +345,7 @@
         document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
         document.getElementById('file-input').onchange = e => { if(e.target.files[0]) sendFile(e.target.files[0]); };
 
-        init();
+        window.onload = () => { navigate('bridge'); init(); };
     </script>
 </body>
 </html>
