@@ -1,0 +1,288 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TITAN TURBO | Multi-Channel P2P</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #000; color: #0f0; font-family: 'JetBrains Mono', monospace; }
+        .sidebar { transition: 0.3s; transform: translateX(-100%); z-index: 1000; background: rgba(0,20,0,0.95); border-right: 1px solid #0f0; }
+        .sidebar.open { transform: translateX(0); }
+        .terminal-box { border: 1px solid #0f0; background: rgba(0,10,0,0.8); box-shadow: 0 0 20px rgba(0,255,0,0.1); }
+        .speed-bar { height: 2px; background: #0f0; transition: width 0.1s; box-shadow: 0 0 10px #0f0; }
+        .btn-term { border: 1px solid #0f0; padding: 10px; transition: 0.2s; text-transform: uppercase; font-weight: bold; }
+        .btn-term:hover { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
+        input { background: #000; border: 1px solid #050; padding: 10px; color: #0f0; outline: none; }
+        input:focus { border-color: #0f0; }
+        @keyframes scan { from { top: 0; } to { top: 100%; } }
+        .scanline { position: fixed; top: 0; left: 0; width: 100%; height: 5px; background: rgba(0,255,0,0.03); animation: scan 3s linear infinite; pointer-events: none; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col">
+    <div class="scanline"></div>
+
+    <!-- Header -->
+    <header class="p-4 border-b border-green-900 flex justify-between items-center bg-black">
+        <div class="flex items-center gap-4">
+            <button id="menu-btn" class="text-2xl">☰</button>
+            <span class="font-bold tracking-tighter">TITAN_TURBO_V4</span>
+        </div>
+        <div class="text-right">
+            <div id="bitrate" class="text-xl font-bold">0.00 MB/S</div>
+            <div class="text-[8px] opacity-50 uppercase tracking-widest">Aggregate Throughput</div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <nav id="sidebar" class="fixed inset-y-0 left-0 w-64 pt-20 p-6 sidebar">
+        <div class="flex flex-col gap-6">
+            <button onclick="goto('link')" class="text-left hover:pl-2 transition-all">_CONNECT</button>
+            <button onclick="goto('comms')" class="text-left hover:pl-2 transition-all">_MESSAGES</button>
+            <button onclick="goto('cargo')" class="text-left hover:pl-2 transition-all">_FILES</button>
+            <div class="mt-20 p-4 border border-green-900">
+                <span class="text-[10px] block opacity-50">LOCAL_NODE_ID</span>
+                <span id="my-id" class="text-white">...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="flex-grow flex items-center justify-center p-4">
+        
+        <!-- Link Page -->
+        <section id="p-link" class="page max-w-md w-full terminal-box p-8 space-y-6">
+            <h2 class="text-center font-bold">ESTABLISH_P2P_STRIPE</h2>
+            <div class="flex flex-col gap-4">
+                <input type="text" id="target-id" maxlength="3" placeholder="PEER_ID" class="text-center text-2xl tracking-[1em]">
+                <button id="conn-btn" class="btn-term shadow-lg">Init Link</button>
+            </div>
+            <p class="text-[9px] opacity-50 italic">Note: Uses 4 parallel data channels for maximum throughput.</p>
+        </section>
+
+        <!-- Comms Page -->
+        <section id="p-comms" class="page hidden w-full max-w-4xl h-[70vh] terminal-box flex flex-col">
+            <div id="chat-log" class="flex-grow p-4 overflow-y-auto text-xs space-y-1"></div>
+            <form id="chat-form" class="p-2 border-t border-green-900 flex">
+                <input type="text" id="chat-input" class="flex-grow border-none" placeholder="Enter command...">
+            </form>
+        </section>
+
+        <!-- Cargo Page -->
+        <section id="p-cargo" class="page hidden w-full max-w-2xl terminal-box p-8 space-y-6">
+            <div id="drop-zone" class="border-2 border-dashed border-green-900 p-12 text-center cursor-pointer hover:bg-green-950 transition-all">
+                <p>DRAG_AND_DROP_CARGO</p>
+                <p class="text-[10px] opacity-50">MULTI-CHANNEL STREAMING ENABLED</p>
+                <input type="file" id="file-input" class="hidden">
+            </div>
+            <div id="transfer-list" class="space-y-4 max-h-64 overflow-y-auto"></div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- MULTI-CHANNEL ENGINE ---
+        const CHANNEL_COUNT = 4;
+        const CHUNK_SIZE = 16384 * 8; // 128KB 
+        let peer = null;
+        let connections = []; // Array of parallel connections
+        const myAb1Id = Math.random().toString(36).substr(2, 3).toUpperCase();
+        
+        let stats = { bytes: 0, start: 0 };
+        let incomingFile = null;
+
+        document.getElementById('my-id').innerText = myAb1Id;
+
+        function initPeer() {
+            peer = new Peer('TITAN-' + myAb1Id, {
+                config: { 
+                    'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }],
+                    'sdpSemantics': 'unified-plan'
+                }
+            });
+
+            peer.on('connection', (conn) => {
+                manageConnection(conn);
+            });
+        }
+
+        function manageConnection(conn) {
+            conn.on('open', () => {
+                connections.push(conn);
+                if(connections.length === 1) { // First connection
+                    document.getElementById('conn-btn').innerText = 'LINK_ACTIVE';
+                    addLog('SYSTEM', 'Primary bridge open.');
+                }
+                addLog('SYSTEM', `Channel ${connections.length} synchronized.`);
+            });
+
+            conn.on('data', (data) => {
+                if (data instanceof ArrayBuffer) {
+                    handleBinary(data);
+                } else {
+                    handleJson(data);
+                }
+            });
+
+            conn.on('close', () => {
+                connections = connections.filter(c => c !== conn);
+                if(connections.length === 0) {
+                    document.getElementById('conn-btn').innerText = 'Init Link';
+                    addLog('SYSTEM', 'All bridges severed.');
+                }
+            });
+        }
+
+        // --- SPEED OPTIMIZED SENDER ---
+        async function sendFile(file) {
+            if (connections.length === 0) return alert('No active bridge.');
+            
+            const fileId = Math.random().toString(36).substr(7);
+            createUI(file.name, fileId);
+            
+            // Broadcast Meta to all channels (though only one is needed)
+            const meta = { type: 'meta', id: fileId, name: file.name, size: file.size, mime: file.type };
+            connections[0].send(meta);
+
+            let offset = 0;
+            let channelIndex = 0;
+            stats.start = Date.now();
+            stats.bytes = 0;
+
+            const sendChunk = () => {
+                const conn = connections[channelIndex % connections.length];
+                
+                // Backpressure Check per channel
+                if (conn.dataChannel.bufferedAmount > 4 * 1024 * 1024) {
+                    setTimeout(sendChunk, 5);
+                    return;
+                }
+
+                const reader = new FileReader();
+                const blob = file.slice(offset, offset + CHUNK_SIZE);
+                
+                reader.onload = (e) => {
+                    conn.send(e.target.result);
+                    offset += e.target.result.byteLength;
+                    stats.bytes += e.target.result.byteLength;
+                    
+                    updateProgress(fileId, (offset/file.size)*100);
+                    showSpeed();
+
+                    if (offset < file.size) {
+                        channelIndex++;
+                        sendChunk();
+                    } else {
+                        connections[0].send({ type: 'eof', id: fileId });
+                        addLog('SYSTEM', 'Transfer complete.');
+                    }
+                };
+                reader.readAsArrayBuffer(blob);
+            };
+
+            sendChunk();
+        }
+
+        function handleBinary(buf) {
+            if (!incomingFile) return;
+            incomingFile.chunks.push(buf);
+            incomingFile.received += buf.byteLength;
+            stats.bytes += buf.byteLength;
+            updateProgress(incomingFile.id, (incomingFile.received/incomingFile.size)*100);
+            showSpeed();
+        }
+
+        function handleJson(msg) {
+            if (msg.type === 'meta') {
+                incomingFile = { ...msg, chunks: [], received: 0 };
+                createUI(msg.name, msg.id, true);
+                stats.start = Date.now();
+                stats.bytes = 0;
+            } else if (msg.type === 'chat') {
+                addLog('REMOTE', msg.data);
+            } else if (msg.type === 'eof') {
+                const blob = new Blob(incomingFile.chunks, { type: incomingFile.mime });
+                const url = URL.createObjectURL(blob);
+                const a = document.getElementById(`dl-${incomingFile.id}`);
+                a.href = url;
+                a.download = incomingFile.name;
+                a.classList.remove('hidden');
+                incomingFile = null;
+            }
+        }
+
+        // --- UI UTILS ---
+        function goto(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.getElementById('p-' + id).classList.remove('hidden');
+            if(window.innerWidth < 1024) toggleMenu();
+        }
+
+        function toggleMenu() { document.getElementById('sidebar').classList.toggle('open'); }
+        document.getElementById('menu-btn').onclick = toggleMenu;
+
+        document.getElementById('conn-btn').onclick = () => {
+            const tid = document.getElementById('target-id').value.toUpperCase();
+            if(!tid) return;
+            // Open multiple parallel connections to the same peer ID
+            for(let i=0; i < CHANNEL_COUNT; i++) {
+                manageConnection(peer.connect('TITAN-' + tid, { reliable: true }));
+            }
+        };
+
+        function addLog(who, msg) {
+            const log = document.getElementById('chat-log');
+            log.innerHTML += `<div><span class="text-green-700">[${who}]</span> ${msg}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function createUI(name, id) {
+            const list = document.getElementById('transfer-list');
+            list.innerHTML = `
+                <div class="p-2 border border-green-900 bg-black">
+                    <div class="flex justify-between text-[10px] mb-1">
+                        <span>${name}</span>
+                        <span id="perc-${id}">0%</span>
+                    </div>
+                    <div class="w-full bg-green-900/20 h-1"><div id="bar-${id}" class="speed-bar w-0 h-full"></div></div>
+                    <a id="dl-${id}" class="hidden block text-center bg-green-600 text-black text-[10px] font-bold mt-2 py-1">DOWNLOAD_BIN</a>
+                </div>
+            ` + list.innerHTML;
+        }
+
+        function updateProgress(id, p) {
+            const bar = document.getElementById('bar-' + id);
+            if(bar) bar.style.width = p + '%';
+            document.getElementById('perc-' + id).innerText = Math.floor(p) + '%';
+        }
+
+        function showSpeed() {
+            const elapsed = (Date.now() - stats.start) / 1000;
+            if (elapsed > 0.5) {
+                const mbps = ((stats.bytes / 1024 / 1024) / elapsed).toFixed(2);
+                document.getElementById('bitrate').innerText = mbps + ' MB/S';
+            }
+        }
+
+        document.getElementById('chat-form').onsubmit = (e) => {
+            e.preventDefault();
+            const val = document.getElementById('chat-input').value;
+            if (val && connections[0]) {
+                connections[0].send({ type: 'chat', data: val });
+                addLog('LOCAL', val);
+                document.getElementById('chat-input').value = '';
+            }
+        };
+
+        document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
+        document.getElementById('file-input').onchange = (e) => {
+            if(e.target.files[0]) sendFile(e.target.files[0]);
+        };
+
+        initPeer();
+    </script>
+</body>
+</html>
