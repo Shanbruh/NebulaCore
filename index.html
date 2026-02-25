@@ -4,423 +4,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TITAN P2P | Advanced Node</title>
+    <title>TITAN ULTRA | Max Throughput P2P</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;700&family=JetBrains+Mono:wght@300;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;400;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --accent: #ffffff;
-            --bg-main: #0a0a0c;
-            --titan-blue: #0066ff;
-            --panel: rgba(20, 20, 25, 0.7);
-        }
+        :root { --accent: #0088ff; --bg: #050505; }
+        body { background: var(--bg); color: #fff; font-family: 'Outfit', sans-serif; overflow: hidden; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
         
-        body {
-            background: var(--bg-main);
-            color: #d1d5db;
-            font-family: 'Outfit', sans-serif;
-            overflow: hidden;
-            -webkit-tap-highlight-color: transparent;
-        }
+        /* High-Performance Canvas */
+        .glass { background: rgba(20, 20, 30, 0.6); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08); }
+        .sidebar { transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); transform: translateX(-100%); z-index: 1000; }
+        .sidebar.open { transform: translateX(0); }
 
-        /* Animated Deep Space Background */
-        .stars-container {
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(circle at 50% 50%, #151520 0%, #0a0a0c 100%);
-            z-index: -2;
-        }
-        .grid-plane {
-            position: fixed;
-            inset: 0;
-            background-image: 
-                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-            background-size: 60px 60px;
-            transform: perspective(1000px) rotateX(60deg) translateY(-100px);
-            z-index: -1;
-            opacity: 0.5;
-        }
-
-        /* Sidebar Navigation */
-        #nav-drawer {
-            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-            background: rgba(10, 10, 12, 0.95);
-            backdrop-filter: blur(20px);
-            transform: translateX(-100%);
-            z-index: 1000;
-        }
-        #nav-drawer.open { transform: translateX(0); }
+        /* Performance Visualizers */
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+        .node-active { animation: pulse 1.5s infinite; background: #00ff88; box-shadow: 0 0 15px #00ff88; }
         
-        .nav-link {
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        .nav-link.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 20%;
-            height: 60%;
-            width: 4px;
-            background: var(--titan-blue);
-            box-shadow: 0 0 15px var(--titan-blue);
-        }
+        .page { display: none; height: 100%; transition: opacity 0.3s; }
+        .page.active { display: flex; flex-direction: column; animation: fadeIn 0.4s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Futuristic Cards */
-        .titan-card {
-            background: var(--panel);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            border-radius: 2px;
-        }
-
-        /* Custom UI Micro-interactions */
-        .btn-titan {
-            background: #fff;
-            color: #000;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            border-radius: 2px;
-        }
-        .btn-titan:hover:not(:disabled) {
-            background: var(--titan-blue);
-            color: white;
-            box-shadow: 0 0 30px rgba(0, 102, 255, 0.4);
-        }
-        .btn-titan:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        .id-badge {
-            background: linear-gradient(135deg, #1e1e24 0%, #111115 100%);
-            border: 1px solid rgba(255,255,255,0.1);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 2px; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); }
-
-        @keyframes pulse-status {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.5); opacity: 0.5; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .status-pulse { animation: pulse-status 2s infinite; }
-        
-        .page { display: none; height: 100%; width: 100%; flex-direction: column; }
-        .page.active { display: flex; animation: fadeIn 0.4s ease-out; }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        /* Speed Gauge */
+        .speed-bar { height: 2px; background: var(--accent); position: absolute; bottom: 0; left: 0; transition: width 0.1s; box-shadow: 0 0 10px var(--accent); }
     </style>
 </head>
-<body class="h-screen w-screen selection:bg-blue-500/30">
-    <div class="stars-container"></div>
-    <div class="grid-plane"></div>
+<body class="h-screen w-screen selection:bg-blue-500/50">
 
-    <!-- Header -->
-    <header class="fixed top-0 left-0 right-0 h-20 flex items-center px-6 md:px-12 z-[100] border-b border-white/5 bg-black/20 backdrop-blur-md">
-        <button id="menu-btn" class="p-3 hover:bg-white/5 transition-all text-white mr-6">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h8m-8 6h16" />
-            </svg>
-        </button>
-        <div class="flex-grow">
-            <h1 class="text-xl font-bold tracking-[0.3em] uppercase opacity-90">Titan <span class="text-blue-500">Node</span></h1>
-            <p class="text-[9px] uppercase tracking-widest opacity-40">Synchronous P2P Interface</p>
+    <!-- Global Speed HUD -->
+    <header class="fixed top-0 inset-x-0 h-16 glass z-[500] flex items-center px-6 justify-between border-b border-white/5">
+        <div class="flex items-center gap-4">
+            <button id="menu-toggle" class="p-2 hover:bg-white/5 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <span class="font-bold tracking-[0.4em] uppercase text-sm">Titan <span class="text-blue-500">Ultra</span></span>
         </div>
-        <div class="hidden md:flex items-center gap-6 px-6 py-2 bg-white/5 border border-white/10">
-            <div class="text-[10px] text-right">
-                <span class="block opacity-40 uppercase tracking-tighter">Throughput</span>
-                <span id="global-speed" class="font-bold text-blue-500">0.00 MB/s</span>
+        <div class="flex items-center gap-8 px-4 py-1 bg-black/40 border border-white/5">
+            <div class="hidden sm:block">
+                <span class="text-[8px] uppercase opacity-40 block leading-none">Velocity</span>
+                <span id="speed-val" class="mono text-blue-400 font-bold">0.00 <span class="text-[10px] opacity-70">MB/S</span></span>
             </div>
             <div class="w-[1px] h-6 bg-white/10"></div>
-            <div id="connection-indicator" class="w-2 h-2 rounded-full bg-red-600 status-pulse"></div>
+            <div class="flex items-center gap-2">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_red]"></div>
+                <span id="status-text" class="text-[10px] uppercase font-bold tracking-widest opacity-60">Disconnected</span>
+            </div>
         </div>
     </header>
 
-    <!-- Navigation Drawer -->
-    <nav id="nav-drawer" class="fixed inset-y-0 left-0 w-72 pt-28 px-4 border-r border-white/10">
-        <div class="space-y-2">
-            <button onclick="navigate('base')" class="nav-link active w-full py-4 px-6 flex items-center gap-4 hover:bg-white/5">
-                <span class="text-[10px] font-bold uppercase tracking-widest">01 / Command</span>
-            </button>
-            <button onclick="navigate('relay')" class="nav-link w-full py-4 px-6 flex items-center gap-4 hover:bg-white/5">
-                <span class="text-[10px] font-bold uppercase tracking-widest">02 / Relay Comms</span>
-            </button>
-            <button onclick="navigate('cargo')" class="nav-link w-full py-4 px-6 flex items-center gap-4 hover:bg-white/5">
-                <span class="text-[10px] font-bold uppercase tracking-widest">03 / Cargo Hold</span>
-            </button>
+    <!-- Navigation -->
+    <nav id="sidebar" class="fixed inset-y-0 left-0 w-64 glass sidebar pt-24 px-4 border-r border-white/5">
+        <div class="flex flex-col gap-2">
+            <button onclick="showPage('node')" class="w-full text-left p-4 hover:bg-white/5 text-[10px] uppercase tracking-[.3em] font-bold border-l-2 border-transparent hover:border-blue-500 transition-all">01. Node Config</button>
+            <button onclick="showPage('comms')" class="w-full text-left p-4 hover:bg-white/5 text-[10px] uppercase tracking-[.3em] font-bold border-l-2 border-transparent hover:border-blue-500 transition-all">02. Quantum Comms</button>
+            <button onclick="showPage('data')" class="w-full text-left p-4 hover:bg-white/5 text-[10px] uppercase tracking-[.3em] font-bold border-l-2 border-transparent hover:border-blue-500 transition-all">03. High-Speed Uplink</button>
         </div>
-        
-        <div class="absolute bottom-8 left-8 right-8 p-4 bg-white/5 border border-white/10">
-            <div class="text-[10px] uppercase opacity-40 mb-1">Local Address</div>
-            <div id="display-id" class="text-lg font-bold tracking-widest text-blue-400">CONNECTING...</div>
+        <div class="absolute bottom-10 left-6 right-6 p-4 bg-black/40 border border-white/5 text-center">
+            <span class="text-[8px] opacity-30 uppercase block mb-1">Peer Cluster ID</span>
+            <span id="my-id" class="mono text-lg font-bold text-blue-500">---</span>
         </div>
     </nav>
 
-    <!-- Main Content Frame -->
-    <main id="content-frame" class="h-full pt-20 px-4 md:px-12 flex items-center justify-center">
+    <!-- Main Content -->
+    <main class="h-full w-full pt-16 flex items-center justify-center p-4">
         
-        <!-- Page 01: Connection Base -->
-        <section id="page-base" class="page active max-w-xl">
-            <div class="titan-card p-10 flex flex-col gap-10">
+        <!-- Page: Node (Connection) -->
+        <section id="page-node" class="page active max-w-md w-full">
+            <div class="glass p-8 rounded-sm space-y-8">
                 <div class="text-center">
-                    <h2 class="text-3xl font-light tracking-widest uppercase mb-2">Establish <span class="font-bold text-white">Link</span></h2>
-                    <p class="text-xs opacity-50 uppercase tracking-[0.3em]">Enter target AB1 protocol key</p>
+                    <h2 class="text-2xl font-light uppercase tracking-widest">Establish <span class="font-bold">Bridge</span></h2>
+                    <p class="text-[9px] opacity-40 uppercase tracking-[0.5em] mt-1">Direct SCTP Binary Link</p>
                 </div>
-
-                <div class="space-y-6">
-                    <div class="relative">
-                        <input type="text" id="target-id" maxlength="3" 
-                        class="w-full bg-black/60 border border-white/10 p-6 text-4xl text-center font-bold uppercase tracking-[1em] focus:outline-none focus:border-blue-500 focus:bg-white/[0.02] transition-all"
-                        placeholder="---">
-                    </div>
-                    <button id="connect-btn" class="btn-titan w-full py-6 text-sm">Initialize Handshake</button>
-                </div>
-                
-                <div class="border-t border-white/5 pt-6 flex justify-between items-center px-2">
-                    <span class="text-[10px] opacity-40 uppercase">Session Security</span>
-                    <span class="text-[10px] text-blue-500 font-bold uppercase">WebRTC v2 Active</span>
+                <div class="space-y-4">
+                    <input type="text" id="target-id" maxlength="3" 
+                           class="w-full bg-black/60 border border-white/10 p-5 text-4xl text-center mono font-bold uppercase tracking-[1em] focus:outline-none focus:border-blue-500 transition-all"
+                           placeholder="---">
+                    <button id="connect-btn" class="w-full bg-white text-black py-5 text-xs font-bold uppercase tracking-[0.2em] hover:bg-blue-500 hover:text-white transition-all">Initialize Handshake</button>
                 </div>
             </div>
         </section>
 
-        <!-- Page 02: Relay (Chat) -->
-        <section id="page-relay" class="page max-w-4xl h-[75vh]">
-            <div class="titan-card h-full flex flex-col overflow-hidden">
-                <div class="p-4 border-b border-white/5 flex justify-between items-center">
-                    <span class="text-[10px] font-bold tracking-[0.3em] uppercase opacity-60">Relay_Stream.log</span>
+        <!-- Page: Comms (Chat) -->
+        <section id="page-comms" class="page max-w-4xl w-full h-[70vh]">
+            <div class="glass h-full flex flex-col rounded-sm overflow-hidden">
+                <div id="chat-stream" class="flex-grow p-6 overflow-y-auto mono text-xs leading-relaxed space-y-2 opacity-80">
+                    <div class="opacity-20 uppercase">[System] Secure line ready...</div>
                 </div>
-                <div id="chat-buffer" class="flex-grow p-6 overflow-y-auto font-mono text-sm leading-relaxed space-y-4">
-                    <div class="opacity-20 text-xs">[!] AWAITING PEER CONNECTION</div>
-                </div>
-                <form id="chat-form" class="p-4 bg-black/40 flex gap-4 border-t border-white/5">
-                    <input type="text" id="chat-input" autocomplete="off" placeholder="Type transmission..." class="flex-grow bg-transparent border-b border-white/20 p-2 focus:outline-none focus:border-blue-500 transition-colors text-sm">
-                    <button class="btn-titan px-10 py-2 text-xs">Send</button>
+                <form id="chat-form" class="p-4 bg-black/40 flex border-t border-white/5">
+                    <input type="text" id="chat-input" autocomplete="off" placeholder="Type packet data..." 
+                           class="flex-grow bg-transparent border-none p-2 focus:outline-none text-sm">
+                    <button class="px-8 py-2 bg-blue-600 text-[10px] font-bold uppercase">Send</button>
                 </form>
             </div>
         </section>
 
-        <!-- Page 03: Cargo (File) -->
-        <section id="page-cargo" class="page max-w-2xl h-[75vh]">
-            <div class="flex flex-col gap-6 h-full">
-                <div id="drop-zone" class="titan-card p-12 border-dashed border-2 border-white/10 hover:border-blue-500 transition-all cursor-pointer flex flex-col items-center justify-center gap-6 group">
+        <!-- Page: Data (High Speed Transfer) -->
+        <section id="page-data" class="page max-w-2xl w-full">
+            <div class="flex flex-col gap-6">
+                <div id="drop-zone" class="glass p-16 border-dashed border-2 border-white/10 hover:border-blue-500 transition-all cursor-pointer flex flex-col items-center justify-center group relative overflow-hidden">
                     <input type="file" id="file-input" class="hidden">
-                    <div class="w-20 h-20 flex items-center justify-center border border-white/10 group-hover:border-blue-500 transition-all rounded-full">
-                        <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" stroke-width="1.5"/></svg>
+                    <div class="text-center z-10">
+                        <svg class="w-12 h-12 text-blue-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="1.5"/></svg>
+                        <p class="text-xs font-bold uppercase tracking-[0.4em]">Zero-Latency Uplink</p>
+                        <p class="text-[9px] opacity-30 mt-2 uppercase">Drag payload for binary streaming</p>
                     </div>
-                    <div class="text-center">
-                        <p class="text-xs font-bold uppercase tracking-[0.4em] mb-1">Select Cargo</p>
-                        <p class="text-[10px] opacity-30 uppercase tracking-widest">Encrypted Binary Delivery</p>
-                    </div>
+                    <div id="active-speed-bar" class="speed-bar w-0"></div>
                 </div>
-
-                <div class="flex-grow overflow-y-auto space-y-4 pr-2" id="cargo-manifest">
-                    <!-- Transfer elements -->
-                </div>
+                <div id="transfer-manifest" class="space-y-3 overflow-y-auto max-h-[40vh] pr-2"></div>
             </div>
         </section>
 
     </main>
 
     <script>
-        // --- NAVIGATION HANDLER ---
-        const menuBtn = document.getElementById('menu-btn');
-        const drawer = document.getElementById('nav-drawer');
+        // --- PERFORMANCE CONFIG ---
+        const PEER_PREFIX = "TITAN-ULTRA-";
+        const CHUNK_SIZE = 16384 * 8; // 128KB Chunks - Maximum stable SCTP window payload
+        const BUFFER_THRESHOLD = 1024 * 1024 * 4; // 4MB Buffer limit before throttling
         
-        function navigate(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            
-            document.getElementById(`page-${pageId}`).classList.add('active');
-            const link = Array.from(document.querySelectorAll('.nav-link')).find(b => b.onclick.toString().includes(pageId));
-            if(link) link.classList.add('active');
-            
-            if(window.innerWidth < 1024) toggleMenu();
-        }
-
-        function toggleMenu() { drawer.classList.toggle('open'); }
-        menuBtn.onclick = toggleMenu;
-
-        // --- P2P ENGINE (Optimized for 10MB/s+) ---
-        const CHUNK_SIZE = 131072; // 128KB - optimized for modern network buffers
-        const AB1_ID = generateAB1();
         let peer = null;
         let conn = null;
+        let ab1Id = generateAB1();
         let stats = { start: 0, bytes: 0 };
 
         function generateAB1() {
             const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let res = '';
-            for(let i=0; i<3; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
-            return res;
+            return Array.from({length:3}, () => chars.charAt(Math.floor(Math.random()*chars.length))).join('');
         }
 
+        // --- CORE P2P ENGINE ---
         function init() {
-            // Display internal ID but use real ID for connection
-            peer = new Peer(`TITAN-${AB1_ID}`);
+            peer = new Peer(PEER_PREFIX + ab1Id, { debug: 1 });
             
             peer.on('open', (id) => {
-                document.getElementById('display-id').innerText = AB1_ID;
+                document.getElementById('my-id').innerText = ab1Id;
             });
 
-            peer.on('connection', c => {
-                if(conn) return c.close();
-                bridge(c);
+            peer.on('connection', (c) => {
+                if(conn) return c.close(); // Only one dedicated high-speed link
+                setupLink(c);
             });
         }
 
-        function bridge(c) {
+        function setupLink(c) {
             conn = c;
             conn.on('open', () => {
-                document.getElementById('connection-indicator').className = "w-2 h-2 rounded-full bg-blue-500 status-pulse shadow-[0_0_10px_#3b82f6]";
-                document.getElementById('connect-btn').innerText = 'DISCONNECT';
-                log('System', 'Bridge Online :: Protocol 256v3');
+                updateUIStatus(true);
+                addLog('System', 'Bridge Established. High-speed binary mode active.');
+                document.getElementById('connect-btn').innerText = 'Break Bridge';
             });
 
-            conn.on('data', data => {
-                if(data.type === 'msg') log('Remote', data.payload);
-                if(data.type === 'f-meta') incomingInit(data.payload);
-                if(data.type === 'f-chunk') incomingData(data.payload);
+            conn.on('data', (data) => {
+                // High-speed data multiplexer
+                if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
+                    processBinary(data);
+                } else {
+                    handleJsonMsg(data);
+                }
             });
 
             conn.on('close', () => {
+                updateUIStatus(false);
+                addLog('System', 'Bridge Severed.');
                 conn = null;
-                document.getElementById('connection-indicator').className = "w-2 h-2 rounded-full bg-red-600 status-pulse";
-                document.getElementById('connect-btn').innerText = 'INITIALIZE HANDSHAKE';
-                log('System', 'Bridge Severed :: Connection Lost');
+                document.getElementById('connect-btn').innerText = 'Initialize Handshake';
             });
         }
 
-        // --- CHAT LOGIC ---
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chat-input');
-        const chatBuffer = document.getElementById('chat-buffer');
-
-        function log(who, msg) {
-            const div = document.createElement('div');
-            div.className = "flex flex-col gap-1";
-            div.innerHTML = `
-                <div class="flex items-center gap-2">
-                    <span class="text-[9px] font-bold text-blue-500 uppercase">${who}</span>
-                    <span class="text-[8px] opacity-20 font-mono">${new Date().toLocaleTimeString()}</span>
-                </div>
-                <div class="pl-0 text-white opacity-80">${msg}</div>
-            `;
-            chatBuffer.appendChild(div);
-            chatBuffer.scrollTop = chatBuffer.scrollHeight;
-        }
-
-        chatForm.onsubmit = e => {
-            e.preventDefault();
-            if(chatInput.value && conn?.open) {
-                conn.send({type: 'msg', payload: chatInput.value});
-                log('Local', chatInput.value);
-                chatInput.value = '';
-            }
-        };
-
-        // --- CARGO HOLD (FILE) ---
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        
-        dropZone.onclick = () => fileInput.click();
-        fileInput.onchange = e => { if(e.target.files[0]) sendFile(e.target.files[0]); };
-
+        // --- ULTRA-FAST SENDER ---
         async function sendFile(file) {
-            if(!conn?.open) return alert('Source bridge not connected.');
-            const txId = Math.random().toString(36).substr(7);
-            uiCargo(file.name, txId, false);
+            if(!conn?.open) return;
             
-            conn.send({type:'f-meta', payload: {id: txId, name: file.name, size: file.size, type: file.type}});
+            const tid = Math.random().toString(36).substr(7);
+            createTransferUI(file.name, tid, false);
             
+            // Step 1: Send Metadata
+            conn.send({ type: 'f-meta', id: tid, name: file.name, size: file.size, mime: file.type });
+            
+            // Step 2: Binary Stream
             let offset = 0;
-            stats = { start: Date.now(), bytes: 0 };
-            
-            const reader = new FileReader();
-            const push = () => {
-                // Adaptive backpressure control
-                if (conn.dataChannel.bufferedAmount > 2 * 1024 * 1024) return setTimeout(push, 15);
+            stats.start = Date.now();
+            stats.bytes = 0;
+
+            const readAndSend = () => {
+                // Backpressure Check: If WebRTC buffer is full, wait to avoid packet drops
+                if (conn.dataChannel.bufferedAmount > BUFFER_THRESHOLD) {
+                    setTimeout(readAndSend, 5); 
+                    return;
+                }
+
+                const slice = file.slice(offset, offset + CHUNK_SIZE);
+                const reader = new FileReader();
                 
-                const chunk = file.slice(offset, offset + CHUNK_SIZE);
-                reader.readAsArrayBuffer(chunk);
+                reader.onload = (e) => {
+                    // Send RAW ArrayBuffer directly for zero-overhead
+                    conn.send(e.target.result); 
+                    
+                    offset += e.target.result.byteLength;
+                    stats.bytes += e.target.result.byteLength;
+                    
+                    const progress = (offset / file.size) * 100;
+                    updateProgress(tid, progress);
+                    updateSpeedHUD();
+
+                    if (offset < file.size) {
+                        readAndSend();
+                    } else {
+                        conn.send({ type: 'f-eod', id: tid }); // End of Data
+                        addLog('System', `Transmission complete: ${file.name}`);
+                    }
+                };
+                reader.readAsArrayBuffer(slice);
             };
 
-            reader.onload = e => {
-                conn.send({type: 'f-chunk', payload: {id: txId, chunk: e.target.result}});
-                offset += e.target.result.byteLength;
-                stats.bytes += e.target.result.byteLength;
-                uiUpdate(txId, (offset/file.size)*100);
-                uiSpeed();
-                if(offset < file.size) push();
-                else log('System', `Transfer Completed: ${file.name}`);
-            };
-            push();
+            readAndSend();
         }
 
-        let incoming = {};
-        function incomingInit(meta) {
-            incoming[meta.id] = {...meta, chunks: [], received: 0};
-            uiCargo(meta.name, meta.id, true);
-            stats = { start: Date.now(), bytes: 0 };
-        }
-
-        function incomingData(data) {
-            const f = incoming[data.id];
-            if(!f) return;
-            f.chunks.push(data.chunk);
-            f.received += data.chunk.byteLength;
-            stats.bytes += data.chunk.byteLength;
-            uiUpdate(data.id, (f.received/f.size)*100);
-            uiSpeed();
-            if(f.received >= f.size) {
-                const blob = new Blob(f.chunks, {type: f.type});
-                document.getElementById(`dl-${data.id}`).href = URL.createObjectURL(blob);
-                document.getElementById(`dl-${data.id}`).download = f.name;
-                document.getElementById(`dl-${data.id}`).classList.remove('hidden');
-                delete incoming[data.id];
+        // --- BINARY PROCESSOR ---
+        let currentIn = null;
+        function handleJsonMsg(msg) {
+            if (msg.type === 'msg') addLog('Remote', msg.payload);
+            if (msg.type === 'f-meta') {
+                currentIn = { id: msg.id, name: msg.name, size: msg.size, chunks: [], received: 0 };
+                createTransferUI(msg.name, msg.id, true);
+                stats.start = Date.now();
+                stats.bytes = 0;
+            }
+            if (msg.type === 'f-eod') {
+                finalizeIncoming();
             }
         }
 
-        // --- UI UTILS ---
-        function uiCargo(name, id, isInc) {
-            const manifest = document.getElementById('cargo-manifest');
+        function processBinary(buffer) {
+            if (!currentIn) return;
+            currentIn.chunks.push(buffer);
+            currentIn.received += buffer.byteLength;
+            stats.bytes += buffer.byteLength;
+            
+            const progress = (currentIn.received / currentIn.size) * 100;
+            updateProgress(currentIn.id, progress);
+            updateSpeedHUD();
+        }
+
+        function finalizeIncoming() {
+            const blob = new Blob(currentIn.chunks);
+            const url = URL.createObjectURL(blob);
+            const dlBtn = document.getElementById(`dl-${currentIn.id}`);
+            dlBtn.href = url;
+            dlBtn.download = currentIn.name;
+            dlBtn.classList.remove('hidden');
+            currentIn = null;
+        }
+
+        // --- UI HELPERS ---
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${id}`).classList.add('active');
+            if(window.innerWidth < 1024) toggleSidebar();
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+        document.getElementById('menu-toggle').onclick = toggleSidebar;
+
+        function updateUIStatus(online) {
+            const dot = document.getElementById('status-dot');
+            const txt = document.getElementById('status-text');
+            dot.className = online ? 'w-2 h-2 rounded-full node-active shadow-[0_0_15px_#00ff88]' : 'w-2 h-2 rounded-full bg-red-500 shadow-[0_0_10px_red]';
+            txt.innerText = online ? 'Bridge Active' : 'Disconnected';
+            txt.className = online ? 'text-[10px] uppercase font-bold tracking-widest text-green-400' : 'text-[10px] uppercase font-bold tracking-widest opacity-60';
+        }
+
+        function addLog(who, msg) {
+            const box = document.getElementById('chat-stream');
             const div = document.createElement('div');
-            div.className = 'titan-card p-4 flex flex-col gap-3';
+            div.innerHTML = `<span class="opacity-30 mr-2">[${new Date().toLocaleTimeString()}]</span> <span class="text-blue-500 font-bold uppercase">${who}:</span> ${msg}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function createTransferUI(name, id, isInc) {
+            const manifest = document.getElementById('transfer-manifest');
+            const div = document.createElement('div');
+            div.className = 'glass p-4 rounded-sm border-l-2 border-blue-500';
             div.innerHTML = `
-                <div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest">
-                    <span class="truncate w-1/2 opacity-80">${name}</span>
-                    <span id="p-${id}" class="text-blue-500">0%</span>
+                <div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest mb-2">
+                    <span class="truncate w-1/2">${name}</span>
+                    <span id="perc-${id}">0%</span>
                 </div>
-                <div class="h-[2px] bg-white/5 w-full">
-                    <div id="b-${id}" class="h-full bg-blue-500 w-0 transition-all"></div>
+                <div class="h-1 bg-white/5 w-full relative">
+                    <div id="bar-${id}" class="h-full bg-blue-500 w-0 transition-all duration-100 shadow-[0_0_10px_#0088ff]"></div>
                 </div>
-                <a id="dl-${id}" class="hidden text-center text-[9px] font-bold bg-white text-black py-2 tracking-[.2em] uppercase">Retrieve Cargo</a>
+                <a id="dl-${id}" class="hidden block text-center text-[9px] font-bold bg-white text-black py-2 mt-3 tracking-[.3em] uppercase hover:bg-blue-500 hover:text-white transition-all">Download Ready</a>
             `;
             manifest.prepend(div);
         }
 
-        function uiUpdate(id, p) {
-            const bar = document.getElementById(`b-${id}`);
-            const txt = document.getElementById(`p-${id}`);
+        function updateProgress(id, p) {
+            const bar = document.getElementById(`bar-${id}`);
+            const txt = document.getElementById(`perc-${id}`);
+            const speedBar = document.getElementById('active-speed-bar');
             if(bar) bar.style.width = p + '%';
             if(txt) txt.innerText = Math.floor(p) + '%';
+            if(speedBar) speedBar.style.width = p + '%';
         }
 
-        function uiSpeed() {
+        function updateSpeedHUD() {
             const dt = (Date.now() - stats.start)/1000;
             if(dt > 0.5) {
                 const mbps = ((stats.bytes/1024/1024)/dt).toFixed(2);
-                document.getElementById('global-speed').innerText = mbps + ' MB/s';
+                document.getElementById('speed-val').innerHTML = `${mbps} <span class="text-[10px] opacity-70">MB/S</span>`;
+            }
+        }
+
+        // --- LISTENERS ---
+        document.getElementById('drop-zone').onclick = () => document.getElementById('file-input').click();
+        document.getElementById('file-input').onchange = e => { if(e.target.files[0]) sendFile(e.target.files[0]); };
+        
+        document.getElementById('chat-form').onsubmit = e => {
+            e.preventDefault();
+            const inp = document.getElementById('chat-input');
+            if(inp.value && conn?.open) {
+                conn.send({ type: 'msg', payload: inp.value });
+                addLog('Local', inp.value);
+                inp.value = '';
             }
         }
 
@@ -428,9 +335,9 @@
             if(conn) conn.close();
             else {
                 const tid = document.getElementById('target-id').value.toUpperCase();
-                if(tid.length === 3) bridge(peer.connect(`TITAN-${tid}`, {reliable: true}));
+                if(tid.length === 3) setupLink(peer.connect(PEER_PREFIX + tid, { reliable: true }));
             }
-        };
+        }
 
         init();
     </script>
